@@ -393,10 +393,25 @@ func (c *canvas) tapUp(pos fyne.Position, tapID int,
 			dragCallback(c.draggingOuter, ev)
 		}
 
+		dragging := c.dragging
 		c.dragging = nil
 		c.draggingOuter = nil
 		c.otherDirection = container.ScrollBoth
 		c.clearCapturedTap(tapID)
+
+		dropObj, dropPos, _ := c.findObjectAtPositionMatching(pos, func(object fyne.CanvasObject) bool {
+			_, ok := object.(fyne.Droppable)
+			return ok
+		})
+		if dropTarget, ok := dropObj.(fyne.Droppable); ok {
+			dropTarget.Dropped(&fyne.DropEvent{
+				PointEvent: fyne.PointEvent{
+					Position:         dropPos,
+					AbsolutePosition: pos,
+				},
+				Dragged: dragging,
+			})
+		}
 		return
 	}
 

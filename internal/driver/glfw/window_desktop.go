@@ -107,6 +107,7 @@ type window struct {
 
 	onClosed           func()
 	onCloseIntercepted func()
+	onDropped          func(pos fyne.Position, items []fyne.URI)
 
 	menuTogglePending       fyne.KeyName
 	menuDeactivationPending fyne.KeyName
@@ -175,21 +176,32 @@ func (w *window) CenterOnScreen() {
 }
 
 func (w *window) SetOnDropped(dropped func(pos fyne.Position, items []fyne.URI)) {
-	w.runOnMainWhenCreated(func() {
-		w.viewport.SetDropCallback(func(_ *glfw.Window, names []string) {
-			if dropped == nil {
-				return
-			}
+	w.onDropped = dropped
+}
 
-			uris := make([]fyne.URI, len(names))
-			for i, name := range names {
-				uris[i] = storage.NewFileURI(name)
-			}
+func (w *window) mouseDropped(_ *glfw.Window, names []string) {
+	uris := make([]fyne.URI, len(names))
+	for i, name := range names {
+		uris[i] = storage.NewFileURI(name)
+	}
 
-			w.ensurePositionProcessed()
-			dropped(w.mousePos, uris)
-		})
+	w.ensurePositionProcessed()
+	dropObj, dropPos, _ := w.findObjectAtPositionMatching(w.canvas, w.mousePos, func(object fyne.CanvasObject) bool {
+		_, ok := object.(fyne.Droppable)
+		return ok
 	})
+	if dropTarget, ok := dropObj.(fyne.Droppable); ok {
+		dropTarget.Dropped(&fyne.DropEvent{
+			PointEvent: fyne.PointEvent{
+				Position:         dropPos,
+				AbsolutePosition: w.mousePos,
+			},
+			URIs: uris,
+		})
+	}
+	if w.onDropped != nil {
+		w.onDropped(w.mousePos, uris)
+	}
 }
 
 func (w *window) doCenterOnScreen() {
@@ -893,6 +905,7 @@ func (w *window) create() {
 	win.SetKeyCallback(w.keyPressed)
 	win.SetCharCallback(w.charInput)
 	win.SetFocusCallback(w.focused)
+	win.SetDropCallback(w.mouseDropped)
 
 	w.canvas.detectedScale = w.detectScale()
 	w.canvas.scale = w.calculatedScale()

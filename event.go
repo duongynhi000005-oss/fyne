@@ -39,3 +39,12 @@ type DragEvent struct {
 	PointEvent
 	Dragged Delta
 }
+
+// DropEvent defines the parameters of an in-app or external drop onto a [Droppable] target.
+//
+// Since: 2.9
+type DropEvent struct {
+	PointEvent
+	Dragged Draggable
+	URIs    []URI
+}

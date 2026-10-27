@@ -56,6 +56,14 @@ type Draggable interface {
 	DragEnd()
 }
 
+// Droppable indicates that a [CanvasObject] can receive dropped items (either an in-app
+// [Draggable] object released over it or external [URI] items dropped onto the window).
+//
+// Since: 2.9
+type Droppable interface {
+	Dropped(*DropEvent)
+}
+
 // Focusable describes any [CanvasObject] that can respond to being focused.
 // It will receive the FocusGained and FocusLost events appropriately.
 // When focused it will also have TypedRune called as text is input and

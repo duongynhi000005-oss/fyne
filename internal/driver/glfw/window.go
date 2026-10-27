@@ -563,6 +563,20 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action, 
 		if mouseDragStarted {
 			mouseDragged.DragEnd()
 			w.mouseDragStarted = false
+
+			dropObj, dropPos, _ := w.findObjectAtPositionMatching(w.canvas, mousePos, func(object fyne.CanvasObject) bool {
+				_, ok := object.(fyne.Droppable)
+				return ok
+			})
+			if dropTarget, ok := dropObj.(fyne.Droppable); ok {
+				dropTarget.Dropped(&fyne.DropEvent{
+					PointEvent: fyne.PointEvent{
+						Position:         dropPos,
+						AbsolutePosition: mousePos,
+					},
+					Dragged: mouseDragged,
+				})
+			}
 		}
 		if shouldMouseOut {
 			w.mouseOut()
