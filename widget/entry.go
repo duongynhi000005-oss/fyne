@@ -1754,8 +1754,6 @@ func (r *entryRenderer) Refresh() {
 	wrapping := r.entry.Wrapping
 
 	r.entry.syncSegments()
-	r.entry.textWidget.updateRowBounds()
-	r.entry.placeholderWidget.updateRowBounds()
 	r.entry.textWidget.Refresh()
 	r.entry.placeholderWidget.Refresh()
 

@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"fyne.io/fyne/v2/internal/driver/mobile/gl"
+	paint "fyne.io/fyne/v2/internal/painter"
 )
 
 const (
@@ -76,6 +77,8 @@ func (p *painter) Init() {
 	p.maxTextureSize = p.ctx.GetInteger(maxTextureSizeParam)
 	p.blurSnap.texValid = false   // reset on context recreation; old texture IDs are no longer valid
 	p.blurKernel.texValid = false // kernel texture must also be re-created
+	p.atlasTexValid = false       // glyph atlas texture must also be re-created on context recreation
+	p.atlas = paint.GlyphAtlas{}
 	if compiled == nil {
 		compiled = p.compilePrograms()
 	}
@@ -85,6 +88,7 @@ func (p *painter) Init() {
 
 type mobileContext struct {
 	glContext gl.Context
+	byteBuf   []byte
 }
 
 var _ context = (*mobileContext)(nil)
@@ -114,13 +118,13 @@ func (c *mobileContext) BlendFunc(srcFactor, destFactor uint32) {
 }
 
 func (c *mobileContext) BufferData(target uint32, points []float32, usage uint32) {
-	data := toLEByteOrder(points...)
-	c.glContext.BufferData(gl.Enum(target), data, gl.Enum(usage))
+	c.byteBuf = encodeLEFloat32s(c.byteBuf[:0], points)
+	c.glContext.BufferData(gl.Enum(target), c.byteBuf, gl.Enum(usage))
 }
 
 func (c *mobileContext) BufferSubData(target uint32, points []float32) {
-	data := toLEByteOrder(points...)
-	c.glContext.BufferSubData(gl.Enum(target), data)
+	c.byteBuf = encodeLEFloat32s(c.byteBuf[:0], points)
+	c.glContext.BufferSubData(gl.Enum(target), c.byteBuf)
 }
 
 func (c *mobileContext) Clear(mask uint32) {
@@ -291,15 +295,25 @@ func (c *mobileContext) Viewport(x, y, width, height int) {
 	c.glContext.Viewport(x, y, width, height)
 }
 
-// toLEByteOrder returns the byte representation of float32 values in little endian byte order.
-func toLEByteOrder(values ...float32) []byte {
-	b := make([]byte, 4*len(values))
+// encodeLEFloat32s appends or writes the little-endian byte representation of values into dst.
+func encodeLEFloat32s(dst []byte, values []float32) []byte {
+	needed := 4 * len(values)
+	if cap(dst) < needed {
+		dst = make([]byte, needed)
+	} else {
+		dst = dst[:needed]
+	}
 	for i, v := range values {
 		u := math.Float32bits(v)
-		b[4*i+0] = byte(u >> 0)
-		b[4*i+1] = byte(u >> 8)
-		b[4*i+2] = byte(u >> 16)
-		b[4*i+3] = byte(u >> 24)
+		dst[4*i+0] = byte(u >> 0)
+		dst[4*i+1] = byte(u >> 8)
+		dst[4*i+2] = byte(u >> 16)
+		dst[4*i+3] = byte(u >> 24)
 	}
-	return b
+	return dst
+}
+
+// toLEByteOrder returns the byte representation of float32 values in little endian byte order.
+func toLEByteOrder(values ...float32) []byte {
+	return encodeLEFloat32s(nil, values)
 }

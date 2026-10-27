@@ -301,56 +301,59 @@ func (c *canvas) tapMove(pos fyne.Position, tapID int,
 	offset := fyne.Delta{DX: deltaX, DY: deltaY}
 	c.lastTapDelta[tapID] = offset
 
-	co, objPos, _ := c.findObjectAtPositionMatching(pos, func(object fyne.CanvasObject) bool {
-		if _, ok := object.(fyne.Draggable); ok {
-			return true
-		} else if _, ok := object.(mobile.Touchable); ok {
-			return true
+	if c.dragging == nil || c.touched[tapID] != nil {
+		co, objPos, _ := c.findObjectAtPositionMatching(pos, func(object fyne.CanvasObject) bool {
+			if _, ok := object.(fyne.Draggable); ok {
+				return true
+			} else if _, ok := object.(mobile.Touchable); ok {
+				return true
+			}
+
+			return false
+		})
+
+		if c.touched[tapID] != nil {
+			if touch, ok := co.(mobile.Touchable); !ok || c.touched[tapID] != touch {
+				touchEv := &mobile.TouchEvent{}
+				touchEv.ID = tapID
+				touchEv.Position = objPos
+				touchEv.AbsolutePosition = pos
+				c.touched[tapID].TouchCancel(touchEv)
+				c.touched[tapID] = nil
+			}
 		}
 
-		return false
-	})
-	var scrollOtherDirection fyne.CanvasObject
-	if scr, ok := co.(*container.Scroll); ok {
-		switch scr.Direction {
-		case container.ScrollHorizontalOnly:
-			c.otherDirection = container.ScrollVerticalOnly
-		case container.ScrollVerticalOnly:
-			c.otherDirection = container.ScrollHorizontalOnly
-		}
-		if c.otherDirection != container.ScrollBoth {
-			scrollOtherDirection, _, _ = c.findObjectAtPositionMatching(pos, func(object fyne.CanvasObject) bool {
-				if scr, ok := object.(*container.Scroll); ok {
-					return scr.Direction == c.otherDirection || scr.Direction == container.ScrollBoth
+		if c.dragging == nil {
+			drag, ok := co.(fyne.Draggable)
+			if !ok {
+				return
+			}
+
+			var scrollOtherDirection fyne.CanvasObject
+			if scr, ok := co.(*container.Scroll); ok {
+				switch scr.Direction {
+				case container.ScrollHorizontalOnly:
+					c.otherDirection = container.ScrollVerticalOnly
+				case container.ScrollVerticalOnly:
+					c.otherDirection = container.ScrollHorizontalOnly
 				}
+				if c.otherDirection != container.ScrollBoth {
+					scrollOtherDirection, _, _ = c.findObjectAtPositionMatching(pos, func(object fyne.CanvasObject) bool {
+						if scr, ok := object.(*container.Scroll); ok {
+							return scr.Direction == c.otherDirection || scr.Direction == container.ScrollBoth
+						}
 
-				return false
-			})
-		}
-	}
+						return false
+					})
+				}
+			}
 
-	if c.touched[tapID] != nil {
-		if touch, ok := co.(mobile.Touchable); !ok || c.touched[tapID] != touch {
-			touchEv := &mobile.TouchEvent{}
-			touchEv.ID = tapID
-			touchEv.Position = objPos
-			touchEv.AbsolutePosition = pos
-			c.touched[tapID].TouchCancel(touchEv)
-			c.touched[tapID] = nil
-		}
-	}
-
-	if c.dragging == nil {
-		drag, ok := co.(fyne.Draggable)
-		if !ok {
-			return
-		}
-
-		c.dragging = drag
-		c.dragOffset = previousPos.Subtract(objPos)
-		c.dragStart = co.Position()
-		if scrollOtherDirection != nil {
-			c.draggingOuter, _ = scrollOtherDirection.(fyne.Draggable)
+			c.dragging = drag
+			c.dragOffset = previousPos.Subtract(objPos)
+			c.dragStart = co.Position()
+			if scrollOtherDirection != nil {
+				c.draggingOuter, _ = scrollOtherDirection.(fyne.Draggable)
+			}
 		}
 	}
 
